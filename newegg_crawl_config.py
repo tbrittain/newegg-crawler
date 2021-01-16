@@ -11,16 +11,18 @@ headless_mode = False
 sold_by_newegg = True
 
 # webdriver absolute path
-webdriver_path = "D:/Github/newegg_crawler/geckodriver.exe"
+webdriver_path = "D:/Github/newegg/geckodriver.exe"
 
 # keywords to find in the title of the item
-search_keywords = ["6800", "6900", "RTX", "2060", "2070", "2080",
-                   "3060", "3070", "3080", "3090"]
+# search_keywords = ["6800", "6900", "RTX", "2060", "2070", "2080",
+#                    "3060", "3070", "3080", "3090"]
+
+search_keywords = ["TI", "Ti"]
 
 # comma-separated list of strings of item numbers in order of buy preference
 # the bot will attempt to purchase the item in order, giving highest
 # preference to the first items -> last items
-item_preference = []
+watched_items = ['N82E16814125915', 'N82E16814125916', 'N82E16814126170']
 
 # max price to catch as an integer or float
 price_threshold = 600

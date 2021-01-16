@@ -16,7 +16,7 @@ import pandas as pd
 
 class NeweggCrawler:
     def __init__(self):
-        self.product_hits = []
+        self.product_hits = {}
         self.products_hit_count = 0
         self.search_url = config.url
         self.search_keywords = config.search_keywords
@@ -42,7 +42,7 @@ class NeweggCrawler:
 
     def search(self):
         # clear variables from previous search, if applicable
-        self.product_hits = []
+        self.product_hits = {}
         self.products_hit_count = 0
 
         # initiate selenium connection to webpage
@@ -138,13 +138,15 @@ class NeweggCrawler:
                         keyword_match = True
                         # print(f"Keyword hit for {keyword}")
 
-                # product of potential interest,
+                # product of interest that is in stock
                 if keyword_match and in_stock and product_price is not None and product_price < self.price_threshold:
                     self.products_hit_count += 1
                     print(f"{product_name} is in stock with price {product_price}, "
                           f"({round(100 * (1 - (product_price / self.price_threshold)), 2)}% less "
                           f"than the threshold of {self.price_threshold})")
+                    self.product_hits[item_no] = product_url
 
+                # product of interest that is not in stock (for logging purposes)
                 if keyword_match and product_price is not None and product_price < self.price_threshold:
                     product_row = self.format_row(product_name=product_name, product_price=product_price,
                                                   in_stock=in_stock, product_url=product_url, item_number=item_no)
@@ -175,6 +177,10 @@ class NeweggCrawler:
             self.log_products(product_dataframe=total_product_array, filename=self.output_filename)
         if self.products_hit_count > 0:
             self.notify()
+
+    # TODO
+    def purchase(self):
+        pass
 
     @staticmethod
     def notify():
@@ -219,6 +225,5 @@ if __name__ == "__main__":
     crawler.search()
     print(crawler.product_hits)
     # while True:
-    #     # schedule.run_all(delay_seconds=0)
     #     schedule.run_pending()
     #     time.sleep(4)
