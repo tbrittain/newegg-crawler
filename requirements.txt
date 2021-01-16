@@ -1,0 +1,10 @@
+openpyxl~=3.0.6
+win10toast~=0.9
+selenium~=3.141.0
+schedule>=0.6.0
+pip~=20.3.3
+pypiwin32~=223
+pywin32~=300
+urllib3~=1.26.2
+jdcal~=1.4.1
+setuptools~=51.1.2
