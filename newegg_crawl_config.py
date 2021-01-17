@@ -1,4 +1,6 @@
 # THIS FILE CONTAINS VARIABLES FOR USE IN THE NEWEGG CRAWL
+
+
 # newegg page url
 url = "https://www.newegg.com/p/pl?N=100007709"
 
@@ -17,7 +19,7 @@ webdriver_path = "D:/Github/newegg/geckodriver.exe"
 # search_keywords = ["6800", "6900", "RTX", "2060", "2070", "2080",
 #                    "3060", "3070", "3080", "3090"]
 
-search_keywords = ["TI", "Ti"]
+search_keywords = ["TI"]
 
 # comma-separated list of strings of item numbers in order of buy preference
 # the bot will attempt to purchase the item in order, giving highest
@@ -30,7 +32,17 @@ price_threshold = 600
 # time in minutes between crawls
 search_interval = 30
 
-# time in seconds between page reloads
+# time in seconds between bot actions on page -- keep above 2 or 3 to not flag your IP as a bot
 parse_interval = 3
 
+# output file name without extension (is .xlsx by default)
 output_filename = "log"
+
+#
+buy_product = True
+
+hashed_pass = b'4pLmBtvIgitATIdNH4QDRv5DSsYHTYJJWC4iI5nMqgk='
+
+salt = b'CSfN\x87\t#\xbb\xf8Vc\xb1\xbc\x93\x93\xaa'
+
+twilio = False

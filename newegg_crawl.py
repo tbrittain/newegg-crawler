@@ -9,6 +9,7 @@ import os
 import time
 from datetime import datetime
 import pandas as pd
+import cryptography
 
 
 # This currently is only for Firefox-based Selenium
@@ -26,6 +27,7 @@ class NeweggCrawler:
         self.output_filename = config.output_filename
         self.parse_interval = config.parse_interval
         self.sold_by_newegg = config.sold_by_newegg
+        self.buy_product = config.buy_product
 
         # may want to put this code under search method
         if self.headless_mode:
@@ -40,11 +42,25 @@ class NeweggCrawler:
             self.search_url += " 8000"
         self.search_url += f"&LeftPriceRange=0+{self.price_threshold}"
 
-    def search(self):
+    def run(self):
+        """
+        Function to coordinate the running of the bot. Use this method directly rather than the others.
+        """
         # clear variables from previous search, if applicable
         self.product_hits = {}
         self.products_hit_count = 0
+        self.search()
 
+        if self.products_hit_count > 0:
+            self.notify()
+
+        if self.buy_product:
+            pass
+
+    def search(self):
+        """
+        Search Newegg for products matching keywords in config file
+        """
         # initiate selenium connection to webpage
         self.driver.maximize_window()
         self.driver.get(url=self.search_url)
@@ -175,8 +191,6 @@ class NeweggCrawler:
         pd.options.display.width = 0
         if len(total_product_array) > 0:
             self.log_products(product_dataframe=total_product_array, filename=self.output_filename)
-        if self.products_hit_count > 0:
-            self.notify()
 
     # TODO
     def purchase(self):
@@ -220,10 +234,9 @@ class NeweggCrawler:
 if __name__ == "__main__":
     crawler = NeweggCrawler()
     search_interval = config.search_interval
-    schedule.every(search_interval).minutes.do(crawler.search)
+    schedule.every(search_interval).minutes.do(crawler.run)
 
-    crawler.search()
-    print(crawler.product_hits)
+    crawler.run()
     # while True:
     #     schedule.run_pending()
     #     time.sleep(4)
