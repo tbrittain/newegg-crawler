@@ -41,8 +41,8 @@ output_filename = "log"
 #
 buy_product = True
 
-hashed_pass = b'4pLmBtvIgitATIdNH4QDRv5DSsYHTYJJWC4iI5nMqgk='
+hashed_key = b'y28wf4TOxUJBScdL4QajuSg1SMuTNIvHEDz-G4MbHKs='
 
-salt = b'CSfN\x87\t#\xbb\xf8Vc\xb1\xbc\x93\x93\xaa'
+salt = b'\xb4-9\x0035\xedYE\xe1LUd"\xe5$'
 
 twilio = False
