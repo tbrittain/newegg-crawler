@@ -9,7 +9,9 @@ import os
 import time
 from datetime import datetime
 import pandas as pd
-import cryptography
+from encryption import SymmetricEncrypt
+from alive_progress import alive_bar, config_handler
+import logging
 
 
 # This currently is only for Firefox-based Selenium
@@ -18,7 +20,6 @@ import cryptography
 class NeweggCrawler:
     def __init__(self):
         self.product_hits = {}
-        self.products_hit_count = 0
         self.search_url = config.url
         self.search_keywords = config.search_keywords
         self.price_threshold = config.price_threshold
@@ -29,7 +30,6 @@ class NeweggCrawler:
         self.sold_by_newegg = config.sold_by_newegg
         self.buy_product = config.buy_product
 
-        # may want to put this code under search method
         if self.headless_mode:
             options = Options()
             options.headless = self.headless_mode
@@ -46,22 +46,26 @@ class NeweggCrawler:
         """
         Function to coordinate the running of the bot. Use this method directly rather than the others.
         """
+        config_handler.set_global(spinner='dots_recur')
+        # log to console and recent_run.log
+        self.setup_logging()
         # clear variables from previous search, if applicable
         self.product_hits = {}
-        self.products_hit_count = 0
         self.search()
 
-        if self.products_hit_count > 0:
-            self.notify()
+        if len(self.product_hits) > 0:
+            self.notify_toast()
 
         if self.buy_product:
-            pass
+            self.purchase()
 
     def search(self):
         """
         Search Newegg for products matching keywords in config file
         """
         # initiate selenium connection to webpage
+        logger.info(f"Running job on {datetime.now()}")
+        logger.debug(f"Initializing connection to {self.search_url}")
         self.driver.maximize_window()
         self.driver.get(url=self.search_url)
 
@@ -81,123 +85,124 @@ class NeweggCrawler:
         columns = ["Product", "Price", "InStock", "URL", "Timestamp", "ItemNumber"]
         total_product_array = pd.DataFrame(columns=columns)
 
-        print(f"Running job at {datetime.now()}")
-
         # begin iteration through pages
         begin_time = time.perf_counter()
-        while current_page <= max_page:
+        with alive_bar(total=max_page, title='Parsing pages...', bar='bubbles') as bar:
+            while current_page <= max_page:
 
-            print(f"Current page: {current_page}")
-            item_cells = self.driver.find_elements_by_class_name("item-container")
-            for item in item_cells:
-                title_info = item.find_element_by_class_name("item-title")
+                # print(f"Current page: {current_page}")
+                item_cells = self.driver.find_elements_by_class_name("item-container")
+                for item in item_cells:
+                    title_info = item.find_element_by_class_name("item-title")
 
-                # get product name
-                product_name = title_info.text
+                    # get product name
+                    product_name = title_info.text
 
-                # get product url
-                product_url = title_info.get_attribute("href")
+                    # get product url
+                    product_url = title_info.get_attribute("href")
 
-                # get product price
-                product_price = item.find_element_by_class_name("price-current")
-                product_price = product_price.text
-                product_price = product_price.replace("$", "")
-                product_price = product_price.replace(",", "")
+                    # get product price
+                    product_price = item.find_element_by_class_name("price-current")
+                    product_price = product_price.text
+                    product_price = product_price.replace("$", "")
+                    product_price = product_price.replace(",", "")
 
-                print(f"\nCurrent item: {product_name} for {product_price}")
-                print(product_url)
-                if product_price:
-                    try:
-                        # print(product_price)
-                        product_price = float(product_price)
-                    except ValueError:
+                    # print(f"\nCurrent item: {product_name} for {product_price}")
+                    # print(product_url)
+                    if product_price:
                         try:
-                            space_split = product_price.index(" ")
-                            product_price = float(product_price[:space_split])
-                        except ValueError:  # occasionally happens when no price found
-                            product_price = None
-                else:
-                    product_price = None
+                            # print(product_price)
+                            product_price = float(product_price)
+                        except ValueError:
+                            try:
+                                space_split = product_price.index(" ")
+                                product_price = float(product_price[:space_split])
+                            except ValueError:  # occasionally happens when no price found
+                                product_price = None
+                    else:
+                        product_price = None
 
-                # get product id
-                try:
-                    item_url_index = product_url.index("Item=")
-                    item_no = product_url[item_url_index + 5:]
+                    # get product id
                     try:
-                        ampersand_index = item_no.index("&")
-                        item_no = item_no[:ampersand_index]
+                        item_url_index = product_url.index("Item=")
+                        item_no = product_url[item_url_index + 5:]
+                        try:
+                            ampersand_index = item_no.index("&")
+                            item_no = item_no[:ampersand_index]
+                        except ValueError:
+                            pass
                     except ValueError:
+                        combo_url_index = product_url.index("ItemList=")
+                        item_no = product_url[combo_url_index + 9:]
+                        item_no = item_no.replace(".", ": ")
+
+                    # track whether in stock
+                    in_stock = True
+                    try:  # if this item-promo class is present, item is not in stock
+                        promo = item.find_elements_by_xpath(".//p[@class='item-promo']")
+                        if promo:
+                            promo = promo[0].text
+                            if promo == "OUT OF STOCK" or promo == "COMING SOON":
+                                in_stock = False
+                    except NoSuchElementException:
                         pass
-                except ValueError:
-                    combo_url_index = product_url.index("ItemList=")
-                    item_no = product_url[combo_url_index + 9:]
-                    item_no = item_no.replace(".", ": ")
 
-                # track whether in stock
-                in_stock = True
-                try:  # if this item-promo class is present, item is not in stock
-                    promo = item.find_elements_by_xpath(".//p[@class='item-promo']")
-                    if promo:
-                        promo = promo[0].text
-                        if promo == "OUT OF STOCK" or promo == "COMING SOON":
-                            in_stock = False
-                except NoSuchElementException:
-                    pass
+                    # print(f"Item in stock: {in_stock}")
 
-                # print(f"Item in stock: {in_stock}")
+                    keyword_match = False
+                    for keyword in self.search_keywords:
+                        # TODO: use better method than __contains__ because
+                        # false positive hits occur, e.g. keyword 570 causes 5700 to be a hit
+                        if product_name.__contains__(keyword):
+                            keyword_match = True
+                            # logger.info(f"Keyword hit for {keyword}")
 
-                keyword_match = False
-                for keyword in self.search_keywords:
-                    # TODO: use better method than __contains__ because
-                    # false positive hits occur, e.g. keyword 570 causes 5700 to be a hit
-                    if product_name.__contains__(keyword):
-                        keyword_match = True
-                        # print(f"Keyword hit for {keyword}")
+                    # product of interest that is in stock
+                    if keyword_match and in_stock and product_price is not None and \
+                            product_price < self.price_threshold:
+                        logger.info(f"{product_name} is in stock with price ${product_price} "
+                                    f"({round(100 * (1 - (product_price / self.price_threshold)), 2)}% less "
+                                    f"than the threshold of ${self.price_threshold})")
+                        self.product_hits[item_no] = product_url
 
-                # product of interest that is in stock
-                if keyword_match and in_stock and product_price is not None and product_price < self.price_threshold:
-                    self.products_hit_count += 1
-                    print(f"{product_name} is in stock with price {product_price}, "
-                          f"({round(100 * (1 - (product_price / self.price_threshold)), 2)}% less "
-                          f"than the threshold of {self.price_threshold})")
-                    self.product_hits[item_no] = product_url
+                    # product of interest that is not in stock (for logging purposes)
+                    if keyword_match and product_price is not None and product_price < self.price_threshold:
+                        product_row = self.format_row(product_name=product_name, product_price=product_price,
+                                                      in_stock=in_stock, product_url=product_url, item_number=item_no)
+                        total_product_array = pd.concat([total_product_array, product_row], ignore_index=True)
 
-                # product of interest that is not in stock (for logging purposes)
-                if keyword_match and product_price is not None and product_price < self.price_threshold:
-                    product_row = self.format_row(product_name=product_name, product_price=product_price,
-                                                  in_stock=in_stock, product_url=product_url, item_number=item_no)
-                    total_product_array = pd.concat([total_product_array, product_row], ignore_index=True)
+                # re-establish page information
+                pagination = self.driver.find_element_by_class_name("list-tool-pagination-text")
+                page_info = pagination.text
+                page_info = page_info.replace("Page ", "")
+                slash_index = page_info.index("/")
+                current_page = int(page_info[:slash_index])
 
-            # re-establish page information
-            pagination = self.driver.find_element_by_class_name("list-tool-pagination-text")
-            page_info = pagination.text
-            page_info = page_info.replace("Page ", "")
-            slash_index = page_info.index("/")
-            current_page = int(page_info[:slash_index])
+                # determine whether to click 'next page' or not
+                next_page_button = pagination.find_element_by_xpath("//button[@title='Next']")
+                if next_page_button.get_property("disabled"):
+                    break
+                else:
+                    self.driver.execute_script("arguments[0].click();", next_page_button)
+                    time.sleep(self.parse_interval)
+                bar()
 
-            # determine whether to click 'next page' or not
-            next_page_button = pagination.find_element_by_xpath("//button[@title='Next']")
-            if next_page_button.get_property("disabled"):
-                break
-            else:
-                self.driver.execute_script("arguments[0].click();", next_page_button)
-                time.sleep(self.parse_interval)
+            end_time = time.perf_counter()
+            logger.info(f"Scrape completed in {round(end_time - begin_time, 2)} seconds")
 
-        end_time = time.perf_counter()
-        print(f"Scrape completed in {round(end_time - begin_time, 2)} seconds")
+            self.driver.close()
 
-        self.driver.close()
-
-        pd.options.display.width = 0
-        if len(total_product_array) > 0:
-            self.log_products(product_dataframe=total_product_array, filename=self.output_filename)
+            pd.options.display.width = 0
+            if len(total_product_array) > 0:
+                self.log_products(product_dataframe=total_product_array, filename=self.output_filename)
 
     # TODO
     def purchase(self):
-        pass
+        for product_id, product_url in self.product_hits.items():
+            print(product_id, product_url)
 
     @staticmethod
-    def notify():
+    def notify_toast():
         notifier = ToastNotifier()
         notifier.show_toast("Newegg Scraper",
                             "Products of interest are in stock! Check log for details.",
@@ -225,10 +230,27 @@ class NeweggCrawler:
     def log_products(product_dataframe, filename):
         try:
             product_dataframe.to_excel(filename + '.xlsx')
-            print(f"File {filename}.xlsx exported to {os.getcwd()}")
+            logger.info(f"File {filename}.xlsx exported to {os.getcwd()}")
         except PermissionError:
-            print(f'Coule not write to "{filename}.xlsx". It may currently be in use. Please close '
-                  'any programs currently using it and try again.')
+            logger.warning(f'Coule not write to "{filename}.xlsx". It may currently be in use. Please close '
+                           'any programs currently using it and try again.')
+
+    @staticmethod
+    def setup_logging():
+        global logger
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.DEBUG)
+
+        fh = logging.FileHandler('recent_run.log')
+        fh.setLevel(logging.DEBUG)
+
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        ch.setFormatter(formatter)
+        logger.addHandler(fh)
+        logger.addHandler(ch)
 
 
 if __name__ == "__main__":

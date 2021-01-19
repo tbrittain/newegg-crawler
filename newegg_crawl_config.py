@@ -5,7 +5,7 @@
 url = "https://www.newegg.com/p/pl?N=100007709"
 
 # set True for headless mode (to run silently in background) or false to open and view as it runs
-headless_mode = False
+headless_mode = True
 
 # restrict results to those only sold by newegg
 # setting as False will significantly increase results at the cost of time
@@ -19,7 +19,7 @@ webdriver_path = "D:/Github/newegg/geckodriver.exe"
 # search_keywords = ["6800", "6900", "RTX", "2060", "2070", "2080",
 #                    "3060", "3070", "3080", "3090"]
 
-search_keywords = ["TI"]
+search_keywords = ["1060", "1050", "970", "980"]
 
 # comma-separated list of strings of item numbers in order of buy preference
 # the bot will attempt to purchase the item in order, giving highest

@@ -3,6 +3,7 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 import os
 import newegg_crawl_config
+import json
 
 
 class SymmetricEncrypt:
@@ -27,7 +28,7 @@ class SymmetricEncrypt:
         else:
             raise Exception("Incorrect password entered")
 
-    def decrypt(self, raw_password, filename):
+    def get_decrypted_data(self, raw_password, filename):
         if self.check_password(raw_password):
             with open(filename, "rb") as f:
                 info_to_decrypt = f.read()
@@ -62,7 +63,7 @@ class SymmetricEncrypt:
         random_salt = os.urandom(16)
 
         # password key
-        kdf = Scrypt(salt=random_salt, length=32, n=2**20, r=8, p=1)
+        kdf = Scrypt(salt=random_salt, length=32, n=2 ** 20, r=8, p=1)
         key = base64.urlsafe_b64encode(kdf.derive(password_bytes))
 
         print("\nThe following string is a representation of the password hash in bytes. "
@@ -78,10 +79,24 @@ class SymmetricEncrypt:
 
 
 if __name__ == "__main__":
+    # instantiate object
     encryptor = SymmetricEncrypt(salt=newegg_crawl_config.salt, hashed_key=newegg_crawl_config.hashed_key)
+
+    # generate password hash and salt from a master password
     # encryptor.generate_password_hash("testpassword123")
+
+    # testing the check_password method
     # print(encryptor.check_password("testpass123"))
     # print(encryptor.check_password("testPassword123"))
     # print(encryptor.check_password("testpassword123"))
+
+    # encrypt a json file of fake credit card information
     # encryptor.encrypt(raw_password="testpassword123", filename="info.json")
-    print(encryptor.decrypt(filename="info.json.enc", raw_password="testpassword123"))
+
+    # decrypt the encrypted credit card information
+    info = encryptor.get_decrypted_data(filename="info.json.enc", raw_password="testpassword123")
+    # load decrypted credit card info into a json object
+    json_info = json.loads(info)
+    # pretty print json info
+    print(json.dumps(json_info, indent=4))
+    print(json.dumps(json_info["name"]))
