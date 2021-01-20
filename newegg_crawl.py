@@ -4,17 +4,25 @@ from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.common.exceptions import NoSuchElementException
 import openpyxl
-import schedule
 import os
 import time
 from datetime import datetime
 import pandas as pd
 from encryption import SymmetricEncrypt
 from alive_progress import alive_bar, config_handler
-import logging
-
+from project_logging import logger
+import re
+from dotenv import load_dotenv
+from discord.ext import tasks, commands
+import discord
 
 # This currently is only for Firefox-based Selenium
+
+load_dotenv()
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+intents = discord.Intents.default()
+intents.members = True
+bot = commands.Bot(command_prefix=">", case_insensitive=True, help_command=None, intents=intents)
 
 
 class NeweggCrawler:
@@ -29,26 +37,27 @@ class NeweggCrawler:
         self.parse_interval = config.parse_interval
         self.sold_by_newegg = config.sold_by_newegg
         self.buy_product = config.buy_product
-
-        if self.headless_mode:
-            options = Options()
-            options.headless = self.headless_mode
-            self.driver = webdriver.Firefox(executable_path=self.webdriver_path, options=options)
-        else:
-            self.driver = webdriver.Firefox(executable_path=self.webdriver_path)
+        self.watched_items = config.watched_items
 
         # apply some things to the url
         if self.sold_by_newegg:
             self.search_url += " 8000"
         self.search_url += f"&LeftPriceRange=0+{self.price_threshold}"
 
-    def run(self):
+    def start_driver(self, headless: bool):
+        if headless:
+            options = Options()
+            options.headless = headless
+            return webdriver.Firefox(executable_path=self.webdriver_path, options=options)
+        else:
+            return webdriver.Firefox(executable_path=self.webdriver_path)
+
+    async def run(self):
         """
         Function to coordinate the running of the bot. Use this method directly rather than the others.
         """
         config_handler.set_global(spinner='dots_recur')
         # log to console and recent_run.log
-        self.setup_logging()
         # clear variables from previous search, if applicable
         self.product_hits = {}
         self.search()
@@ -57,20 +66,29 @@ class NeweggCrawler:
             self.notify_toast()
 
         if self.buy_product:
-            self.purchase()
+            await self.purchase()
 
     def search(self):
         """
         Search Newegg for products matching keywords in config file
         """
         # initiate selenium connection to webpage
-        logger.info(f"Running job on {datetime.now()}")
+        logger.info(f"\nRunning job on {datetime.now()}")
         logger.debug(f"Initializing connection to {self.search_url}")
-        self.driver.maximize_window()
-        self.driver.get(url=self.search_url)
+        driver = self.start_driver(headless=self.headless_mode)
+        driver.maximize_window()
+        driver.get(url=self.search_url)
 
         # going to iterate over many pages of results (potentially)
-        pagination = self.driver.find_element_by_class_name("list-tool-pagination-text")
+        attempts = 1
+        while attempts <= 3:
+            try:
+                pagination = driver.find_element_by_class_name("list-tool-pagination-text")
+                break
+            except NoSuchElementException:
+                logger.critical(f"Webpage unable to be loaded. Site may be performing captcha check. "
+                                f"Attempt #{attempts}/3")
+
         page_info = pagination.text
         page_info = page_info.replace("Page ", "")
 
@@ -91,7 +109,7 @@ class NeweggCrawler:
             while current_page <= max_page:
 
                 # print(f"Current page: {current_page}")
-                item_cells = self.driver.find_elements_by_class_name("item-container")
+                item_cells = driver.find_elements_by_class_name("item-container")
                 for item in item_cells:
                     title_info = item.find_element_by_class_name("item-title")
 
@@ -147,8 +165,6 @@ class NeweggCrawler:
                     except NoSuchElementException:
                         pass
 
-                    # print(f"Item in stock: {in_stock}")
-
                     keyword_match = False
                     for keyword in self.search_keywords:
                         # TODO: use better method than __contains__ because
@@ -163,7 +179,13 @@ class NeweggCrawler:
                         logger.info(f"{product_name} is in stock with price ${product_price} "
                                     f"({round(100 * (1 - (product_price / self.price_threshold)), 2)}% less "
                                     f"than the threshold of ${self.price_threshold})")
-                        self.product_hits[item_no] = product_url
+
+                        product_information = {
+                            "name": product_name,
+                            "url": product_url,
+                            "price": product_price
+                        }
+                        self.product_hits[item_no] = product_information
 
                     # product of interest that is not in stock (for logging purposes)
                     if keyword_match and product_price is not None and product_price < self.price_threshold:
@@ -172,7 +194,7 @@ class NeweggCrawler:
                         total_product_array = pd.concat([total_product_array, product_row], ignore_index=True)
 
                 # re-establish page information
-                pagination = self.driver.find_element_by_class_name("list-tool-pagination-text")
+                pagination = driver.find_element_by_class_name("list-tool-pagination-text")
                 page_info = pagination.text
                 page_info = page_info.replace("Page ", "")
                 slash_index = page_info.index("/")
@@ -183,23 +205,44 @@ class NeweggCrawler:
                 if next_page_button.get_property("disabled"):
                     break
                 else:
-                    self.driver.execute_script("arguments[0].click();", next_page_button)
+                    driver.execute_script("arguments[0].click();", next_page_button)
                     time.sleep(self.parse_interval)
                 bar()
 
             end_time = time.perf_counter()
             logger.info(f"Scrape completed in {round(end_time - begin_time, 2)} seconds")
 
-            self.driver.close()
+            driver.close()
 
             pd.options.display.width = 0
             if len(total_product_array) > 0:
                 self.log_products(product_dataframe=total_product_array, filename=self.output_filename)
 
-    # TODO
-    def purchase(self):
-        for product_id, product_url in self.product_hits.items():
-            print(product_id, product_url)
+    async def purchase(self):
+        assert isinstance(self.watched_items, list), "Watched items must be a list of item IDs"
+        logger.info("Checking if watched item(s) in stock")
+
+        for item in self.watched_items:
+            if item in list(self.product_hits.keys()):
+                await available_item_message(f"{self.product_hits[item]['name']} is in stock for "
+                                             f"${self.product_hits[item]['price']}! {self.product_hits[item]['url']}")
+                driver = self.start_driver(headless=self.headless_mode)
+                # load product page
+                logger.debug(f"Initializing connection to {self.product_hits[item]['url']} for product "
+                             f"{self.product_hits[item]['name']}")
+                driver.maximize_window()
+                driver.get(url=self.product_hits[item]['url'])
+                time.sleep(3)
+                # adds to cart
+                driver.find_element_by_xpath("//div[@id='ProductBuy']/div/div[2]/button").click()
+                time.sleep(1.5)
+                driver.get(url="https://secure.newegg.com/shop/cart")
+                try:
+                    driver.find_element_by_css_selector('.modal-title > button[data-dismiss="modal"]').click()
+                except NoSuchElementException:
+                    pass
+                time.sleep(5)
+                driver.close()
 
     @staticmethod
     def notify_toast():
@@ -236,29 +279,40 @@ class NeweggCrawler:
                            'any programs currently using it and try again.')
 
     @staticmethod
-    def setup_logging():
-        global logger
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.DEBUG)
+    def validate_url(url: str):
+        # Django url validation regex
+        regex = re.compile(r'^(?:http|ftp)s?://'  # http:// or https://
+                           r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'
+                           r'localhost|'  # localhost...
+                           r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
+                           r'(?::\d+)?'  # optional port
+                           r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+        return re.match(regex, url) is not None
 
-        fh = logging.FileHandler('recent_run.log')
-        fh.setLevel(logging.DEBUG)
 
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
+@bot.event
+async def on_ready():
+    global crawler
+    crawler = NeweggCrawler()
+    logger.info(f"AlertBot is fully loaded and online.")
+    scan.start()
 
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        ch.setFormatter(formatter)
-        logger.addHandler(fh)
-        logger.addHandler(ch)
+
+async def available_item_message(message):
+    await bot.wait_until_ready()
+    await discord.Member.send(bot.get_user(int(os.getenv("DISCORD_USER"))), content=message)
+
+
+async def authentication_message(message):
+    await bot.wait_until_ready()
+    benevolent_dictator = bot.get_user(int(os.getenv("DISCORD_USER")))
+    await discord.User.send(benevolent_dictator, content=message)
+
+
+@tasks.loop(minutes=config.search_interval)
+async def scan():
+    await crawler.run()
 
 
 if __name__ == "__main__":
-    crawler = NeweggCrawler()
-    search_interval = config.search_interval
-    schedule.every(search_interval).minutes.do(crawler.run)
-
-    crawler.run()
-    # while True:
-    #     schedule.run_pending()
-    #     time.sleep(4)
+    bot.run(DISCORD_TOKEN)

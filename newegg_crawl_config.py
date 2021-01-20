@@ -4,8 +4,9 @@
 # newegg page url
 url = "https://www.newegg.com/p/pl?N=100007709"
 
+
 # set True for headless mode (to run silently in background) or false to open and view as it runs
-headless_mode = True
+headless_mode = False
 
 # restrict results to those only sold by newegg
 # setting as False will significantly increase results at the cost of time
@@ -30,10 +31,10 @@ watched_items = ['N82E16814125915', 'N82E16814125916', 'N82E16814126170']
 price_threshold = 600
 
 # time in minutes between crawls
-search_interval = 30
+search_interval = 5
 
 # time in seconds between bot actions on page -- keep above 2 or 3 to not flag your IP as a bot
-parse_interval = 3
+parse_interval = 3.5
 
 # output file name without extension (is .xlsx by default)
 output_filename = "log"
