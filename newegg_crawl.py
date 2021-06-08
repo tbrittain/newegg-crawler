@@ -35,7 +35,7 @@ class NeweggCrawler:
         self.output_filename = config.output_filename
         self.parse_interval = config.parse_interval
         self.sold_by_newegg = config.sold_by_newegg
-        self.buy_product = config.buy_product
+        self.discord_notify = config.discord_notify
         self.watched_items = config.watched_items
 
         # apply some things to the url
@@ -65,8 +65,8 @@ class NeweggCrawler:
         if len(self.product_hits) > 0:
             self.notify_toast()
 
-        if self.buy_product:
-            await self.purchase()
+        if self.discord_notify:
+            await self.notify_chat()
 
     def search(self):
         """
@@ -218,7 +218,7 @@ class NeweggCrawler:
             if len(total_product_array) > 0:
                 self.log_products(product_dataframe=total_product_array, filename=self.output_filename)
 
-    async def purchase(self):
+    async def notify_chat(self):
         assert isinstance(self.watched_items, list), "Watched items must be a list of item IDs"
         logger.info("Checking if watched item(s) in stock")
 
@@ -226,23 +226,6 @@ class NeweggCrawler:
             if item in list(self.product_hits.keys()):
                 await available_item_message(f"{self.product_hits[item]['name']} is in stock for "
                                              f"${self.product_hits[item]['price']}! {self.product_hits[item]['url']}")
-                driver = self.start_driver(headless=self.headless_mode)
-                # load product page
-                logger.debug(f"Initializing connection to {self.product_hits[item]['url']} for product "
-                             f"{self.product_hits[item]['name']}")
-                driver.maximize_window()
-                driver.get(url=self.product_hits[item]['url'])
-                time.sleep(3)
-                # FIXME adds to cart
-                driver.find_element_by_xpath("//div[@id='ProductBuy']/div/div[2]/button").click()
-                time.sleep(1.5)
-                driver.get(url="https://secure.newegg.com/shop/cart")
-                try:
-                    driver.find_element_by_css_selector('.modal-title > button[data-dismiss="modal"]').click()
-                except NoSuchElementException:
-                    pass
-                time.sleep(5)
-                driver.close()
 
     @staticmethod
     def notify_toast():

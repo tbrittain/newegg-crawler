@@ -39,9 +39,5 @@ parse_interval = 3.5
 # output file name without extension (is .xlsx by default)
 output_filename = "log"
 
-# ========================== experimental features - not functional ==========================
-buy_product = False
-
-hashed_key = b'y28wf4TOxUJBScdL4QajuSg1SMuTNIvHEDz-G4MbHKs='
-
-salt = b'\xb4-9\x0035\xedYE\xe1LUd"\xe5$'
+# send message to self on discord with product info
+discord_notify = True
