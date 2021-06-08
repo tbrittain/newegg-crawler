@@ -4,9 +4,8 @@
 # newegg generic result page url
 url = "https://www.newegg.com/p/pl?N=100007709"
 
-
-# set True for headless mode (to run silently in background) or false to open and view as it runs
-headless_mode = False
+# set True for headless mode (to run silently in background) or False to open and view as it runs
+headless_mode = True
 
 # restrict results to those only sold by newegg
 # setting as False will significantly increase results at the cost of time
