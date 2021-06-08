@@ -1,7 +1,7 @@
 # THIS FILE CONTAINS VARIABLES FOR USE IN THE NEWEGG CRAWL
 
 
-# newegg page url
+# newegg generic result page url
 url = "https://www.newegg.com/p/pl?N=100007709"
 
 
@@ -13,7 +13,7 @@ headless_mode = False
 # especially as lots of these 3rd party results aren't really for current tech
 sold_by_newegg = True
 
-# webdriver absolute path
+# geckodriver webdriver absolute path
 webdriver_path = "D:/Github/newegg/geckodriver.exe"
 
 # keywords to find in the title of the item
@@ -27,7 +27,7 @@ search_keywords = ["1060", "1050", "970", "980"]
 # preference to the first items -> last items
 watched_items = ['N82E16814125915', 'N82E16814125916', 'N82E16814126170']
 
-# max price to catch as an integer or float
+# max price in USD to catch as an integer or float
 price_threshold = 600
 
 # time in minutes between crawls
@@ -39,11 +39,9 @@ parse_interval = 3.5
 # output file name without extension (is .xlsx by default)
 output_filename = "log"
 
-#
-buy_product = True
+# ========================== experimental features - not functional ==========================
+buy_product = False
 
 hashed_key = b'y28wf4TOxUJBScdL4QajuSg1SMuTNIvHEDz-G4MbHKs='
 
 salt = b'\xb4-9\x0035\xedYE\xe1LUd"\xe5$'
-
-twilio = False

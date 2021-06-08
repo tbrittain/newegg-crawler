@@ -3,12 +3,10 @@ from win10toast import ToastNotifier
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 from selenium.common.exceptions import NoSuchElementException
-import openpyxl
 import os
 import time
 from datetime import datetime
 import pandas as pd
-from encryption import SymmetricEncrypt
 from alive_progress import alive_bar, config_handler
 from project_logging import logger
 import re
@@ -17,6 +15,7 @@ from discord.ext import tasks, commands
 import discord
 
 # This currently is only for Firefox-based Selenium
+# TODO: save price data to SQLite rather than excel
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -45,6 +44,7 @@ class NeweggCrawler:
         self.search_url += f"&LeftPriceRange=0+{self.price_threshold}"
 
     def start_driver(self, headless: bool):
+        """only works with firefox geckodriver"""
         if headless:
             options = Options()
             options.headless = headless
@@ -233,7 +233,7 @@ class NeweggCrawler:
                 driver.maximize_window()
                 driver.get(url=self.product_hits[item]['url'])
                 time.sleep(3)
-                # adds to cart
+                # FIXME adds to cart
                 driver.find_element_by_xpath("//div[@id='ProductBuy']/div/div[2]/button").click()
                 time.sleep(1.5)
                 driver.get(url="https://secure.newegg.com/shop/cart")
@@ -313,6 +313,8 @@ async def authentication_message(message):
 async def scan():
     await crawler.run()
 
+# TODO: https://conorjohanlon.com/send-an-email-from-python/
+# https://docs.python.org/3/library/sqlite3.html
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
