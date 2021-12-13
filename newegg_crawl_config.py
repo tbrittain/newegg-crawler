@@ -1,5 +1,5 @@
 # THIS FILE CONTAINS VARIABLES FOR USE IN THE NEWEGG CRAWL
-
+import os
 
 # newegg generic result page url
 url = "https://www.newegg.com/p/pl?N=100007709"
@@ -12,8 +12,9 @@ headless_mode = True
 # especially as lots of these 3rd party results aren't really for current tech
 sold_by_newegg = True
 
-# geckodriver webdriver absolute path
-webdriver_path = "D:/Github/newegg/geckodriver.exe"
+# geckodriver path
+# leave empty if it exists in the current working directory
+webdriver_path = ""
 
 # keywords to find in the title of the item
 # search_keywords = ["6800", "6900", "RTX", "2060", "2070", "2080",
@@ -32,11 +33,11 @@ price_threshold = 600
 # time in minutes between crawls
 search_interval = 5
 
-# time in seconds between bot actions on page -- keep above 2 or 3 to not flag your IP as a bot
+# time in seconds between bot actions on page -- keep above a reasonable amount to not flag your IP as a bot
 parse_interval = 3.5
 
-# output file name without extension (is .xlsx by default)
+# output file name without extension (is .csv by default)
 output_filename = "log"
 
-# send message to self on discord with product info
-discord_notify = True
+# push results to Discord webhook
+discord_webhook = ""

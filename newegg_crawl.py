@@ -10,19 +10,7 @@ import pandas as pd
 from alive_progress import alive_bar, config_handler
 from project_logging import logger
 import re
-from dotenv import load_dotenv
-from discord.ext import tasks, commands
-import discord
-
-# This currently is only for Firefox-based Selenium
-# TODO: save price data to SQLite rather than excel
-
-load_dotenv()
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-intents = discord.Intents.default()
-intents.members = True
-bot = commands.Bot(command_prefix=">", case_insensitive=True, help_command=None, intents=intents)
-
+from apscheduler.schedulers.background import BlockingScheduler
 
 class NeweggCrawler:
     def __init__(self):
@@ -30,12 +18,17 @@ class NeweggCrawler:
         self.search_url = config.url
         self.search_keywords = config.search_keywords
         self.price_threshold = config.price_threshold
-        self.webdriver_path = config.webdriver_path
+
+        if config.webdriver_path == "":
+            self.webdriver_path = os.path.join(os.path.dirname(__file__), "geckodriver.exe")
+        else:
+            self.webdriver_path = config.webdriver_path
+        
         self.headless_mode = config.headless_mode
         self.output_filename = config.output_filename
         self.parse_interval = config.parse_interval
         self.sold_by_newegg = config.sold_by_newegg
-        self.discord_notify = config.discord_notify
+        self.discord_webhook = config.discord_webhook
         self.watched_items = config.watched_items
 
         # apply some things to the url
@@ -273,31 +266,11 @@ class NeweggCrawler:
         return re.match(regex, url) is not None
 
 
-@bot.event
-async def on_ready():
-    global crawler
-    crawler = NeweggCrawler()
-    logger.info(f"AlertBot is fully loaded and online.")
-    scan.start()
-
-
-async def available_item_message(message):
-    await bot.wait_until_ready()
-    await discord.Member.send(bot.get_user(int(os.getenv("DISCORD_USER"))), content=message)
-
-
-async def authentication_message(message):
-    await bot.wait_until_ready()
-    benevolent_dictator = bot.get_user(int(os.getenv("DISCORD_USER")))
-    await discord.User.send(benevolent_dictator, content=message)
-
-
-@tasks.loop(minutes=config.search_interval)
-async def scan():
-    await crawler.run()
-
-# TODO: https://conorjohanlon.com/send-an-email-from-python/
-# https://docs.python.org/3/library/sqlite3.html
 
 if __name__ == "__main__":
-    bot.run(DISCORD_TOKEN)
+    newegg_scraper = NeweggCrawler()
+
+    scheduler = BlockingScheduler()
+    scheduler.add_job(func=newegg_scraper.run, trigger='cron', minute=config.search_interval)
+    scheduler.start()
+    
