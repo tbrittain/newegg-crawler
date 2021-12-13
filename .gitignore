@@ -128,4 +128,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 /pyvenv.cfg
+
+# newegg crawler specifics
 /log.xlsx
+.vscode/

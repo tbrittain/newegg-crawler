@@ -1,5 +1,4 @@
 # THIS FILE CONTAINS VARIABLES FOR USE IN THE NEWEGG CRAWL
-import os
 
 # newegg generic result page url
 url = "https://www.newegg.com/p/pl?N=100007709"

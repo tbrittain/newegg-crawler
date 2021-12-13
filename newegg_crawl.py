@@ -12,6 +12,7 @@ from project_logging import logger
 import re
 from apscheduler.schedulers.background import BlockingScheduler
 
+
 class NeweggCrawler:
     def __init__(self):
         self.product_hits = {}
@@ -20,10 +21,11 @@ class NeweggCrawler:
         self.price_threshold = config.price_threshold
 
         if config.webdriver_path == "":
-            self.webdriver_path = os.path.join(os.path.dirname(__file__), "geckodriver.exe")
+            self.webdriver_path = os.path.join(
+                os.path.dirname(__file__), "geckodriver.exe")
         else:
             self.webdriver_path = config.webdriver_path
-        
+
         self.headless_mode = config.headless_mode
         self.output_filename = config.output_filename
         self.parse_interval = config.parse_interval
@@ -76,7 +78,8 @@ class NeweggCrawler:
         attempts = 1
         while attempts <= 3:
             try:
-                pagination = driver.find_element_by_class_name("list-tool-pagination-text")
+                pagination = driver.find_element_by_class_name(
+                    "list-tool-pagination-text")
                 break
             except NoSuchElementException:
                 logger.critical(f"Webpage unable to be loaded. Site may be performing captcha check. "
@@ -93,7 +96,8 @@ class NeweggCrawler:
         # keep track of products that match hits from
 
         # define empty pandas dataframe to hold product information
-        columns = ["Product", "Price", "InStock", "URL", "Timestamp", "ItemNumber"]
+        columns = ["Product", "Price", "InStock",
+                   "URL", "Timestamp", "ItemNumber"]
         total_product_array = pd.DataFrame(columns=columns)
 
         # begin iteration through pages
@@ -102,7 +106,8 @@ class NeweggCrawler:
             while current_page <= max_page:
 
                 # print(f"Current page: {current_page}")
-                item_cells = driver.find_elements_by_class_name("item-container")
+                item_cells = driver.find_elements_by_class_name(
+                    "item-container")
                 for item in item_cells:
                     title_info = item.find_element_by_class_name("item-title")
 
@@ -113,7 +118,8 @@ class NeweggCrawler:
                     product_url = title_info.get_attribute("href")
 
                     # get product price
-                    product_price = item.find_element_by_class_name("price-current")
+                    product_price = item.find_element_by_class_name(
+                        "price-current")
                     product_price = product_price.text
                     product_price = product_price.replace("$", "")
                     product_price = product_price.replace(",", "")
@@ -127,7 +133,8 @@ class NeweggCrawler:
                         except ValueError:
                             try:
                                 space_split = product_price.index(" ")
-                                product_price = float(product_price[:space_split])
+                                product_price = float(
+                                    product_price[:space_split])
                             except ValueError:  # occasionally happens when no price found
                                 product_price = None
                     else:
@@ -150,7 +157,8 @@ class NeweggCrawler:
                     # track whether in stock
                     in_stock = True
                     try:  # if this item-promo class is present, item is not in stock
-                        promo = item.find_elements_by_xpath(".//p[@class='item-promo']")
+                        promo = item.find_elements_by_xpath(
+                            ".//p[@class='item-promo']")
                         if promo:
                             promo = promo[0].text
                             if promo == "OUT OF STOCK" or promo == "COMING SOON":
@@ -184,35 +192,42 @@ class NeweggCrawler:
                     if keyword_match and product_price is not None and product_price < self.price_threshold:
                         product_row = self.format_row(product_name=product_name, product_price=product_price,
                                                       in_stock=in_stock, product_url=product_url, item_number=item_no)
-                        total_product_array = pd.concat([total_product_array, product_row], ignore_index=True)
+                        total_product_array = pd.concat(
+                            [total_product_array, product_row], ignore_index=True)
 
                 # re-establish page information
-                pagination = driver.find_element_by_class_name("list-tool-pagination-text")
+                pagination = driver.find_element_by_class_name(
+                    "list-tool-pagination-text")
                 page_info = pagination.text
                 page_info = page_info.replace("Page ", "")
                 slash_index = page_info.index("/")
                 current_page = int(page_info[:slash_index])
 
                 # determine whether to click 'next page' or not
-                next_page_button = pagination.find_element_by_xpath("//button[@title='Next']")
+                next_page_button = pagination.find_element_by_xpath(
+                    "//button[@title='Next']")
                 if next_page_button.get_property("disabled"):
                     break
                 else:
-                    driver.execute_script("arguments[0].click();", next_page_button)
+                    driver.execute_script(
+                        "arguments[0].click();", next_page_button)
                     time.sleep(self.parse_interval)
                 bar()
 
             end_time = time.perf_counter()
-            logger.info(f"Scrape completed in {round(end_time - begin_time, 2)} seconds")
+            logger.info(
+                f"Scrape completed in {round(end_time - begin_time, 2)} seconds")
 
             driver.close()
 
             pd.options.display.width = 0
             if len(total_product_array) > 0:
-                self.log_products(product_dataframe=total_product_array, filename=self.output_filename)
+                self.log_products(
+                    product_dataframe=total_product_array, filename=self.output_filename)
 
     async def notify_chat(self):
-        assert isinstance(self.watched_items, list), "Watched items must be a list of item IDs"
+        assert isinstance(self.watched_items,
+                          list), "Watched items must be a list of item IDs"
         logger.info("Checking if watched item(s) in stock")
 
         for item in self.watched_items:
@@ -266,11 +281,10 @@ class NeweggCrawler:
         return re.match(regex, url) is not None
 
 
-
 if __name__ == "__main__":
     newegg_scraper = NeweggCrawler()
 
     scheduler = BlockingScheduler()
-    scheduler.add_job(func=newegg_scraper.run, trigger='cron', minute=config.search_interval)
+    scheduler.add_job(func=newegg_scraper.run, trigger='cron',
+                      minute=config.search_interval)
     scheduler.start()
-    
