@@ -1,13 +1,17 @@
 import logging
+import newegg_crawl_config as config
+
+log_level = config.log_level
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(log_level)
 
-fh = logging.FileHandler('recent_run.log')
-fh.setLevel(logging.DEBUG)
+if (config.log_to_file):
+    fh = logging.FileHandler(config.log_file)
+    fh.setLevel(log_level)
 
 ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
+ch.setLevel(log_level)
 
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)

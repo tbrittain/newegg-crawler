@@ -1,7 +1,8 @@
 import newegg_crawl_config as config
 from win10toast import ToastNotifier
 from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.common.exceptions import NoSuchElementException
 import os
 import time
@@ -16,61 +17,67 @@ from apscheduler.schedulers.background import BlockingScheduler
 class NeweggCrawler:
     def __init__(self):
         self.product_hits = {}
-        self.search_url = config.url
         self.search_keywords = config.search_keywords
         self.price_threshold = config.price_threshold
-
-        if config.webdriver_path == "":
-            self.webdriver_path = os.path.join(
-                os.path.dirname(__file__), "geckodriver.exe")
-        else:
-            self.webdriver_path = config.webdriver_path
-
         self.headless_mode = config.headless_mode
         self.output_filename = config.output_filename
         self.parse_interval = config.parse_interval
         self.sold_by_newegg = config.sold_by_newegg
-        self.discord_webhook = config.discord_webhook
         self.watched_items = config.watched_items
 
-        # apply some things to the url
+        assert NeweggCrawler.validate_url(config.search_url), "Invalid search url"
+        assert NeweggCrawler.validate_url(config.discord_webhook_url), "Invalid discord webhook url"
+
+        self.search_url = config.url
+        self.discord_webhook_url = config.discord_webhook_url
+
         if self.sold_by_newegg:
             self.search_url += " 8000"
         self.search_url += f"&LeftPriceRange=0+{self.price_threshold}"
 
-    def start_driver(self, headless: bool):
-        """only works with firefox geckodriver"""
-        if headless:
-            options = Options()
-            options.headless = headless
-            return webdriver.Firefox(executable_path=self.webdriver_path, options=options)
+        if config.webdriver_type == "firefox":
+            self.webdriver_path = os.path.join(os.path.dirname(__file__), "geckodriver.exe")
+        elif config.webdriver_type == "chrome":
+            self.webdriver_path = os.path.join(os.path.dirname(__file__), "chromedriver.exe")
         else:
-            return webdriver.Firefox(executable_path=self.webdriver_path)
+            raise Exception("Invalid webdriver type")
 
-    async def run(self):
+    def _start_driver(self, headless: bool):
+        if config.webdriver_type == "firefox":
+            options = FirefoxOptions()
+            if headless:
+                options.add_argument("--headless")
+            return webdriver.Firefox(options=options, executable_path=self.webdriver_path)
+        elif config.webdriver_type == "chrome":
+            options = ChromeOptions()
+            if headless:
+                options.add_argument("--headless")
+            return webdriver.Chrome(options=options, executable_path=self.webdriver_path)
+
+    def run(self):
         """
-        Function to coordinate the running of the bot. Use this method directly rather than the others.
+        Runs the crawler and notifies the user when items are in stock
         """
         config_handler.set_global(spinner='dots_recur')
         # log to console and recent_run.log
         # clear variables from previous search, if applicable
         self.product_hits = {}
-        self.search()
+        self._search()
 
         if len(self.product_hits) > 0:
             self.notify_toast()
 
         if self.discord_notify:
-            await self.notify_chat()
+            self._notify_chat()
 
-    def search(self):
+    def _search(self):
         """
         Search Newegg for products matching keywords in config file
         """
         # initiate selenium connection to webpage
         logger.info(f"\nRunning job on {datetime.now()}")
         logger.debug(f"Initializing connection to {self.search_url}")
-        driver = self.start_driver(headless=self.headless_mode)
+        driver = self._start_driver(headless=self.headless_mode)
         driver.maximize_window()
         driver.get(url=self.search_url)
 
@@ -124,8 +131,10 @@ class NeweggCrawler:
                     product_price = product_price.replace("$", "")
                     product_price = product_price.replace(",", "")
 
-                    # print(f"\nCurrent item: {product_name} for {product_price}")
-                    # print(product_url)
+                    logger.debug(
+                        f"\nCurrent item: {product_name} for {product_price}")
+                    logger.debug(product_url)
+
                     if product_price:
                         try:
                             # print(product_price)
@@ -225,15 +234,16 @@ class NeweggCrawler:
                 self.log_products(
                     product_dataframe=total_product_array, filename=self.output_filename)
 
-    async def notify_chat(self):
+    # FIXME: push to webhook instead of printing to console
+    def _notify_chat(self):
         assert isinstance(self.watched_items,
                           list), "Watched items must be a list of item IDs"
         logger.info("Checking if watched item(s) in stock")
 
         for item in self.watched_items:
             if item in list(self.product_hits.keys()):
-                await available_item_message(f"{self.product_hits[item]['name']} is in stock for "
-                                             f"${self.product_hits[item]['price']}! {self.product_hits[item]['url']}")
+                print(f"{self.product_hits[item]['name']} is in stock for "
+                      f"${self.product_hits[item]['price']}! {self.product_hits[item]['url']}")
 
     @staticmethod
     def notify_toast():
@@ -261,7 +271,7 @@ class NeweggCrawler:
         return pd.DataFrame(row, index=[0])
 
     @staticmethod
-    def log_products(product_dataframe, filename):
+    def log_products(product_dataframe: pd.DataFrame, filename):
         try:
             product_dataframe.to_excel(filename + '.xlsx')
             logger.info(f"File {filename}.xlsx exported to {os.getcwd()}")
@@ -285,6 +295,9 @@ if __name__ == "__main__":
     newegg_scraper = NeweggCrawler()
 
     scheduler = BlockingScheduler()
-    scheduler.add_job(func=newegg_scraper.run, trigger='cron',
-                      minute=config.search_interval)
-    scheduler.start()
+    scheduler.add_job(func=newegg_scraper.run, trigger='interval', seconds=config.search_interval * 60)
+
+    try:
+        scheduler.start()
+    except (KeyboardInterrupt, SystemExit):
+        scheduler.shutdown()

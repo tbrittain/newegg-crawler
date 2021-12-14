@@ -11,9 +11,18 @@ headless_mode = True
 # especially as lots of these 3rd party results aren't really for current tech
 sold_by_newegg = True
 
-# geckodriver path
+# valid webdriver types:
+# chrome: https://chromedriver.chromium.org/downloads
+# firefox: https://github.com/mozilla/geckodriver/releases
+webdriver_type = "firefox"
+
+# geckodriver (firefox) path
 # leave empty if it exists in the current working directory
-webdriver_path = ""
+geckodriver_path = ""
+
+# chromedriver path
+# leave empty if it exists in the current working directory
+chromium_path = ""
 
 # keywords to find in the title of the item
 # search_keywords = ["6800", "6900", "RTX", "2060", "2070", "2080",
@@ -39,4 +48,15 @@ parse_interval = 3.5
 output_filename = "log"
 
 # push results to Discord webhook
-discord_webhook = ""
+discord_webhook_url = ""
+
+# logging
+# DEBUG, INFO, WARNING, ERROR, CRITICAL
+# set to WARNING to only log errors
+# set to ERROR to only log errors and critical errors
+# set to CRITICAL to only log critical errors
+# set to DEBUG to log everything
+# set to INFO to log everything but debug messages
+log_level = "DEBUG"
+
+log_to_file = True
