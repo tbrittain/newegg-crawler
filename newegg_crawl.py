@@ -25,8 +25,10 @@ class NeweggCrawler:
         self.sold_by_newegg = config.sold_by_newegg
         self.watched_items = config.watched_items
 
-        assert NeweggCrawler.validate_url(config.search_url), "Invalid search url"
-        assert NeweggCrawler.validate_url(config.discord_webhook_url), "Invalid discord webhook url"
+        assert NeweggCrawler.validate_url(
+            config.search_url), "Invalid search url"
+        assert NeweggCrawler.validate_url(
+            config.discord_webhook_url), "Invalid discord webhook url"
 
         self.search_url = config.url
         self.discord_webhook_url = config.discord_webhook_url
@@ -36,9 +38,11 @@ class NeweggCrawler:
         self.search_url += f"&LeftPriceRange=0+{self.price_threshold}"
 
         if config.webdriver_type == "firefox":
-            self.webdriver_path = os.path.join(os.path.dirname(__file__), "geckodriver.exe")
+            self.webdriver_path = os.path.join(
+                os.path.dirname(__file__), "geckodriver.exe")
         elif config.webdriver_type == "chrome":
-            self.webdriver_path = os.path.join(os.path.dirname(__file__), "chromedriver.exe")
+            self.webdriver_path = os.path.join(
+                os.path.dirname(__file__), "chromedriver.exe")
         else:
             raise Exception("Invalid webdriver type")
 
@@ -231,7 +235,7 @@ class NeweggCrawler:
 
             pd.options.display.width = 0
             if len(total_product_array) > 0:
-                self.log_products(
+                self.write_products_to_csv(
                     product_dataframe=total_product_array, filename=self.output_filename)
 
     # FIXME: push to webhook instead of printing to console
@@ -271,13 +275,19 @@ class NeweggCrawler:
         return pd.DataFrame(row, index=[0])
 
     @staticmethod
-    def log_products(product_dataframe: pd.DataFrame, filename):
+    def write_products_to_csv(product_dataframe: pd.DataFrame, filename):
         try:
+            # FIXME output to csv instead of excel
             product_dataframe.to_excel(filename + '.xlsx')
             logger.info(f"File {filename}.xlsx exported to {os.getcwd()}")
         except PermissionError:
             logger.warning(f'Coule not write to "{filename}.xlsx". It may currently be in use. Please close '
                            'any programs currently using it and try again.')
+
+    @staticmethod
+    def write_products_to_db():
+        # TODO: use sqlite3 and write to a db in the working directory
+        pass
 
     @staticmethod
     def validate_url(url: str):
@@ -295,7 +305,8 @@ if __name__ == "__main__":
     newegg_scraper = NeweggCrawler()
 
     scheduler = BlockingScheduler()
-    scheduler.add_job(func=newegg_scraper.run, trigger='interval', seconds=config.search_interval * 60)
+    scheduler.add_job(func=newegg_scraper.run, trigger='interval',
+                      seconds=config.search_interval * 60)
 
     try:
         scheduler.start()

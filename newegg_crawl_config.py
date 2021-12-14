@@ -14,13 +14,15 @@ sold_by_newegg = True
 # valid webdriver types:
 # chrome: https://chromedriver.chromium.org/downloads
 # firefox: https://github.com/mozilla/geckodriver/releases
+# install the exe somewhere on your system and set the path below
+# or place the driver in the same directory as this script
 webdriver_type = "firefox"
 
-# geckodriver (firefox) path
+# geckodriver (firefox) absolute path
 # leave empty if it exists in the current working directory
 geckodriver_path = ""
 
-# chromedriver path
+# chromedriver absolute path
 # leave empty if it exists in the current working directory
 chromium_path = ""
 
