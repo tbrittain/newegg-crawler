@@ -46,11 +46,17 @@ search_interval = 5
 # time in seconds between bot actions on page -- keep above a reasonable amount to not flag your IP as a bot
 parse_interval = 3.5
 
-# output file name without extension (is .csv by default)
+# output table file name without extension (is .csv by default)
 output_filename = "log"
 
 # push results to Discord webhook
 discord_webhook_url = ""
+
+# list of snowflakes of a discord user, role, or channel to mention in the content of the webhook
+# ex. user: <@279098137484722176>
+# ex. role: <@&496160161459863552>
+# ex. channel: <#508500699458306049>
+discord_mentions = []
 
 # logging
 # DEBUG, INFO, WARNING, ERROR, CRITICAL

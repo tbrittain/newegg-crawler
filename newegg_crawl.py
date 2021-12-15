@@ -71,8 +71,8 @@ class NeweggCrawler:
         if len(self.product_hits) > 0:
             self.notify_toast()
 
-        if self.discord_notify:
-            self._notify_chat()
+        if self.discord_webhook_url:
+            self._post_discord_webhook()
 
     def _search(self):
         """
@@ -141,7 +141,6 @@ class NeweggCrawler:
 
                     if product_price:
                         try:
-                            # print(product_price)
                             product_price = float(product_price)
                         except ValueError:
                             try:
@@ -185,7 +184,7 @@ class NeweggCrawler:
                         # false positive hits occur, e.g. keyword 570 causes 5700 to be a hit
                         if product_name.__contains__(keyword):
                             keyword_match = True
-                            # logger.info(f"Keyword hit for {keyword}")
+                            logger.debug(f"Keyword hit for {keyword}")
 
                     # product of interest that is in stock
                     if keyword_match and in_stock and product_price is not None and \
@@ -239,10 +238,14 @@ class NeweggCrawler:
                     product_dataframe=total_product_array, filename=self.output_filename)
 
     # FIXME: push to webhook instead of printing to console
-    def _notify_chat(self):
+    def _post_discord_webhook(self):
         assert isinstance(self.watched_items,
                           list), "Watched items must be a list of item IDs"
         logger.info("Checking if watched item(s) in stock")
+
+        # TODO: get a product image too?
+        # https://gist.github.com/dragonwocky/ea61c8d21db17913a43da92efe0de634
+        # https://www.geeksforgeeks.org/json-dumps-in-python/
 
         for item in self.watched_items:
             if item in list(self.product_hits.keys()):
@@ -254,7 +257,7 @@ class NeweggCrawler:
         notifier = ToastNotifier()
         notifier.show_toast("Newegg Scraper",
                             "Products of interest are in stock! Check log for details.",
-                            duration=10,
+                            duration=5,
                             icon_path=None,
                             threaded=True)
 
