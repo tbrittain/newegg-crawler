@@ -1,17 +1,17 @@
-import newegg_crawl_config as config
-from win10toast import ToastNotifier
+import os
+import time
+import re
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.common.exceptions import NoSuchElementException
-import os
-import time
-from datetime import datetime
 import pandas as pd
 from alive_progress import alive_bar, config_handler
-from project_logging import logger
-import re
 from apscheduler.schedulers.background import BlockingScheduler
+from win10toast import ToastNotifier
+import newegg_crawl_config as config
+from project_logging import logger
 
 
 class NeweggCrawler:
@@ -46,15 +46,15 @@ class NeweggCrawler:
         else:
             raise Exception("Invalid webdriver type")
 
-    def _start_driver(self, headless: bool):
+    def _create_driver(self):
         if config.webdriver_type == "firefox":
             options = FirefoxOptions()
-            if headless:
+            if self.headless_mode:
                 options.add_argument("--headless")
             return webdriver.Firefox(options=options, executable_path=self.webdriver_path)
         elif config.webdriver_type == "chrome":
             options = ChromeOptions()
-            if headless:
+            if self.headless_mode:
                 options.add_argument("--headless")
             return webdriver.Chrome(options=options, executable_path=self.webdriver_path)
 
@@ -81,7 +81,7 @@ class NeweggCrawler:
         # initiate selenium connection to webpage
         logger.info(f"\nRunning job on {datetime.now()}")
         logger.debug(f"Initializing connection to {self.search_url}")
-        driver = self._start_driver(headless=self.headless_mode)
+        driver = self._create_driver()
         driver.maximize_window()
         driver.get(url=self.search_url)
 
@@ -95,6 +95,9 @@ class NeweggCrawler:
             except NoSuchElementException:
                 logger.critical(f"Webpage unable to be loaded. Site may be performing captcha check. "
                                 f"Attempt #{attempts}/3")
+                time.sleep(5)
+                attempts += 1
+                driver.refresh()
 
         page_info = pagination.text
         page_info = page_info.replace("Page ", "")
